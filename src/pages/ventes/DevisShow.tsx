@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { AppContext } from '../../lib/session'
-import { Quote, dFr, loadQuote, profileNames, quoteStatus } from './salesData'
+import { Quote, dFr, dtFr, loadQuote, profileNames, quoteStatus } from './salesData'
 import { Ask, Confirm, DocHeader, Info, Lines, Msg, Recap, Steps, amber, btn, danger, outline, pdf, primary } from './DocParts'
 import { printPriced } from './printSales'
 
@@ -22,7 +22,7 @@ export default function DevisShow() {
     const x = await loadQuote(id!)
     setQ(x)
     if (!x) return
-    setNames(await profileNames([x.created_by, x.sales_rep_id]))
+    setNames(await profileNames([x.created_by, x.sales_rep_id, x.submitted_by ?? null, x.approved_by ?? null]))
     const { data } = await supabase.from('sales_orders').select('id, number').eq('quote_id', x.id).maybeSingle()
     setOrderId((data as { id: string; number: string } | null) ?? null)
   }
@@ -48,6 +48,10 @@ export default function DevisShow() {
     const r = await supabase.from('quotes').update({ status }).eq('id', q.id)
     if (r.error) throw new Error(r.error.message)
   }
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    const r = await supabase.rpc(fn, args)
+    if (r.error) throw new Error(r.error.message)
+  }
   const convert = async () => {
     const r = await supabase.rpc('convert_quote', { p_quote: q.id })
     if (r.error) throw new Error(r.error.message)
@@ -57,38 +61,72 @@ export default function DevisShow() {
   const open = q.status === 'brouillon' || q.status === 'valide'
   const steps = [
     { key: 'brouillon', label: 'Brouillon', icon: '📝' },
-    { key: 'valide', label: 'Validé', icon: '✅' },
+    { key: 'soumis', label: 'Validation direction', icon: '📨' },
+    { key: 'valide', label: 'Envoyé au client', icon: '✅' },
     { key: 'converti', label: 'Commande', icon: '📦' },
   ]
+  const isDraft = q.status !== 'valide' && q.status !== 'converti'
   const expired = open && q.valid_until && q.valid_until < new Date().toISOString().slice(0, 10)
 
   return (
     <div className="space-y-3">
       <Steps steps={steps} current={steps.findIndex((s) => s.key === q.status)} />
       <DocHeader number={q.number} badge={quoteStatus(q.status)} sub={q.clients?.name}>
-        {open && ctx.can('quotes.edit') && (
+        {q.status === 'brouillon' && ctx.can('quotes.edit') && (
           <Link to={`/ventes/devis/${q.id}/modifier`} className={`${btn} ${outline}`}>
             Modifier
           </Link>
         )}
-        {q.status === 'brouillon' && ctx.can('quotes.validate') && (
-          <button type="button" disabled={busy} onClick={() => setAsk({ question: 'Valider ce devis ?', run: () => setStatus('valide') })} className={`${btn} ${outline}`}>
-            Valider
-          </button>
-        )}
-        {open && (ctx.can('orders.create') || ctx.can('sales.transform')) && (
+        {q.status === 'brouillon' && (ctx.can('quotes.create') || ctx.can('quotes.edit')) && (
           <button
             type="button"
             disabled={busy}
-            onClick={() => setAsk({ question: `Transformer le devis ${q.number} en commande client ? Le devis ne sera plus modifiable.`, run: convert })}
+            onClick={() => setAsk({ question: `Soumettre le devis ${q.number} à la direction pour validation ?`, run: () => rpc('submit_quote', { p_quote: q.id }) })}
             className={`${btn} ${amber}`}
           >
-            Transformer en commande
+            Soumettre à la direction
           </button>
         )}
-        {open && ctx.can('quotes.edit') && (
+        {q.status === 'soumis' && ctx.can('quotes.validate') && (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setAsk({ question: `Valider le devis ${q.number} (${q.clients?.name}) ? Le commercial pourra l'envoyer au client.`, run: () => rpc('approve_quote', { p_quote: q.id }) })}
+              className={`${btn} ${primary}`}
+            >
+              Valider le devis
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                setAsk({
+                  question: 'Renvoyer le devis au commercial pour correction ?',
+                  note: true,
+                  noteLabel: 'Motif du renvoi (obligatoire)',
+                  run: (n) => rpc('return_quote', { p_quote: q.id, p_note: n }),
+                })
+              }
+              className={`${btn} ${outline}`}
+            >
+              Renvoyer au commercial
+            </button>
+          </>
+        )}
+        {q.status === 'valide' && (ctx.can('orders.create') || ctx.can('sales.transform')) && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setAsk({ question: `Le client a donné son accord : transformer le devis ${q.number} en commande ?`, run: convert })}
+            className={`${btn} ${amber}`}
+          >
+            Client d'accord → Commande
+          </button>
+        )}
+        {q.status === 'valide' && (ctx.can('quotes.edit') || ctx.can('sales.transform')) && (
           <button type="button" disabled={busy} onClick={() => setAsk({ question: 'Le client refuse ce devis ?', run: () => setStatus('refuse') })} className={`${btn} ${danger}`}>
-            Refusé
+            Refusé par le client
           </button>
         )}
         {orderId && (
@@ -100,7 +138,7 @@ export default function DevisShow() {
           type="button"
           onClick={() =>
             printPriced({
-              title: 'DEVIS',
+              title: isDraft ? 'PROJET DE DEVIS' : 'DEVIS',
               number: q.number,
               date: q.issued_at,
               client: q.clients,
@@ -125,6 +163,9 @@ export default function DevisShow() {
         </Link>
       </DocHeader>
 
+      {q.status === 'brouillon' && q.decision_note && <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm rounded-[4px] px-4 py-2">↩ Renvoyé par la direction : {q.decision_note}</div>}
+      {q.status === 'soumis' && !ctx.can('quotes.validate') && <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-[4px] px-4 py-2">Devis en attente de validation par la direction. Il ne peut pas encore être envoyé au client.</div>}
+      {q.status === 'valide' && <div className="bg-blue-50 border border-blue-200 text-blue-900 text-sm rounded-[4px] px-4 py-2">Devis validé par la direction : imprimez-le (PDF) et envoyez-le au client. Quand le client donne son accord, cliquez sur « Client d'accord → Commande ».</div>}
       {expired && <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-[4px] px-4 py-2">Ce devis a dépassé sa date de validité ({dFr(q.valid_until)}). Vérifiez les prix avant de le transformer.</div>}
       {ask && <Confirm ask={ask} busy={busy} note={note} setNote={setNote} onCancel={() => setAsk(null)} onOk={() => run(ask)} />}
       <Msg msg={msg} />
@@ -141,6 +182,8 @@ export default function DevisShow() {
               ['Conditions de paiement', q.payment_terms],
               ['Adresse de livraison', q.delivery_address],
               ['Créé par', q.created_by ? names[q.created_by] : null],
+              ['Soumis', q.submitted_at ? `${dtFr(q.submitted_at)}${q.submitted_by ? ' · ' + (names[q.submitted_by] ?? '') : ''}` : null],
+              ['Validé par la direction', q.approved_at ? `${dtFr(q.approved_at)}${q.approved_by ? ' · ' + (names[q.approved_by] ?? '') : ''}` : null],
               ['Observations', q.notes],
             ]}
           />

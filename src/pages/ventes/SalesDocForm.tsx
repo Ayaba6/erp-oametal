@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { AppContext } from '../../lib/session'
 import { supabase } from '../../lib/supabase'
 import { Warehouse, loadWarehouses } from '../../lib/depots'
 import { Field, FormCard, Section, Select, btnAddSmall, fi, fta } from '../../components/A3Form'
 import { Article, loadArticles } from '../stocks/articleData'
-import { Client, addDays, fcfa, loadClients, loadQuote, loadSalesOrder, today } from './salesData'
+import { CLIENT_TYPES, Client, addDays, fcfa, loadClients, loadQuote, loadSalesOrder, today } from './salesData'
 
 // Formulaire commun Devis / Commande client (modèle A3 ERP : Nb tôles × Longueur = mètres)
 type Kind = 'quote' | 'order'
@@ -26,6 +27,8 @@ export default function SalesDocForm({ kind }: { kind: Kind }) {
   const [params] = useSearchParams()
   const editing = Boolean(id)
   const navigate = useNavigate()
+  const ctx = useOutletContext<AppContext>()
+  const [newClient, setNewClient] = useState<null | { name: string; phone: string; type: Client['type']; payment_mode: Client['payment_mode']; busy?: boolean; err?: string }>(null)
   const base = kind === 'quote' ? '/ventes/devis' : '/ventes/commandes'
   const [clients, setClients] = useState<Client[]>([])
   const [articles, setArticles] = useState<Article[]>([])
@@ -61,7 +64,7 @@ export default function SalesDocForm({ kind }: { kind: Kind }) {
       setReps((p.data as { id: string; full_name: string }[]) ?? [])
       const prod = wh.find((d) => d.type === 'production' && d.is_default) ?? wh.find((d) => d.type === 'production')
       if (doc) {
-        const editable = kind === 'quote' ? ['brouillon', 'valide'].includes(doc.status) : doc.status === 'brouillon'
+        const editable = doc.status === 'brouillon'
         if (!editable) return navigate(`${base}/${doc.id}`, { replace: true })
         const isQuote = 'valid_until' in doc
         setH({
@@ -198,7 +201,59 @@ export default function SalesDocForm({ kind }: { kind: Kind }) {
                     ))}
                   </Select>
                   {client?.is_blocked && <p className="text-[11px] text-red-600 mt-1">Client bloqué : {client.blocked_reason}</p>}
+                  {ctx.can('clients.create') && !newClient && (
+                    <button type="button" onClick={() => setNewClient({ name: '', phone: '', type: 'particulier', payment_mode: 'comptant' })} className="mt-1 text-[12px] font-semibold text-emerald-700 hover:underline">
+                      + Nouveau client
+                    </button>
+                  )}
                 </Field>
+                {newClient && (
+                  <div className="border border-emerald-300 bg-emerald-50/50 rounded-[4px] p-3 space-y-2">
+                    <p className="text-[12px] font-bold text-emerald-900">Nouveau client</p>
+                    <input value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Nom / raison sociale *" className={fi} />
+                    <input value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} placeholder="Téléphone" inputMode="tel" className={fi} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={newClient.type} onChange={(e) => setNewClient({ ...newClient, type: e.target.value as Client['type'] })}>
+                        {CLIENT_TYPES.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </Select>
+                      <Select value={newClient.payment_mode} onChange={(e) => setNewClient({ ...newClient, payment_mode: e.target.value as Client['payment_mode'] })}>
+                        <option value="comptant">Paie avant production</option>
+                        <option value="credit">Paie après livraison</option>
+                      </Select>
+                    </div>
+                    {newClient.err && <p className="text-[12px] text-red-600">{newClient.err}</p>}
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => setNewClient(null)} className="text-[12px] px-3 py-1 border border-gray-300 rounded-[3px] bg-white">
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        disabled={newClient.busy}
+                        onClick={async () => {
+                          if (!newClient.name.trim()) return setNewClient({ ...newClient, err: 'Le nom est obligatoire.' })
+                          setNewClient({ ...newClient, busy: true, err: undefined })
+                          const r = await supabase
+                            .from('clients')
+                            .insert({ name: newClient.name.trim(), phone: newClient.phone.trim() || null, type: newClient.type, payment_mode: newClient.payment_mode })
+                            .select('id')
+                            .single()
+                          if (r.error) return setNewClient({ ...newClient, busy: false, err: r.error.message })
+                          const list = (await loadClients()).filter((x) => x.is_active)
+                          setClients(list)
+                          pickClient(list.find((c) => c.id === (r.data as { id: string }).id))
+                          setNewClient(null)
+                        }}
+                        className="text-[12px] px-3 py-1 bg-emerald-700 text-white rounded-[3px] font-semibold"
+                      >
+                        Créer et choisir
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <Field label="Adresse de livraison">
                   <textarea rows={2} value={h.delivery_address} onChange={(e) => setH({ ...h, delivery_address: e.target.value })} className={fta} />
                 </Field>

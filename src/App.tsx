@@ -80,11 +80,14 @@ export default function App() {
   if (!ctx) return null
 
   const pages = allItems.filter((it) => it.path !== '/' && !BUILT.includes(it.path))
+  // Accueil : tableau de bord pour la direction, sinon le premier écran autorisé du rôle
+  const allowed = allItems.filter((it) => it.path !== '/' && BUILT.includes(it.path) && (!it.perm || ctx.can(it.perm)))
+  const home = (['/production/of', '/tresorerie/caisse', '/ventes/devis'].map((p) => allowed.find((it) => it.path === p)).find(Boolean) ?? allowed[0])?.path ?? '/aucun-acces'
 
   return (
     <Routes>
       <Route element={<Layout ctx={ctx} />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={ctx.can('direction.view') ? <Dashboard /> : <Navigate to={home} replace />} />
         <Route path="/parametres/utilisateurs" element={<Guard ok={ctx.can('users.manage')}><Users /></Guard>} />
         <Route path="/parametres/utilisateurs/nouveau" element={<Guard ok={ctx.can('users.manage')}><UserForm /></Guard>} />
         <Route path="/parametres/utilisateurs/:id" element={<Guard ok={ctx.can('users.manage')}><UserShow /></Guard>} />

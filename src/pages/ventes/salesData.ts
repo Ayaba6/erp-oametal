@@ -83,7 +83,7 @@ type ClientRef = { id: string; code: string | null; name: string; phone: string 
 const CLIENT = 'clients(id, code, name, phone, address, city, ifu)'
 
 // ---------- Devis ----------
-export type QuoteStatus = 'brouillon' | 'valide' | 'converti' | 'refuse' | 'expire' | 'annule'
+export type QuoteStatus = 'brouillon' | 'soumis' | 'valide' | 'converti' | 'refuse' | 'expire' | 'annule'
 export type Quote = {
   id: string
   number: string
@@ -101,12 +101,18 @@ export type Quote = {
   total_ttc: number
   created_by: string | null
   created_at: string
+  submitted_by?: string | null
+  submitted_at?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
+  decision_note?: string | null
   clients: ClientRef | null
   document_lines: DocLine[]
 }
 export const QUOTE_STATUSES: { value: QuoteStatus; label: string; badge: string }[] = [
   { value: 'brouillon', label: 'Brouillon', badge: 'bg-gray-100 text-gray-700' },
-  { value: 'valide', label: 'Validé', badge: 'bg-blue-100 text-blue-700' },
+  { value: 'soumis', label: 'À valider (direction)', badge: 'bg-amber-100 text-amber-800' },
+  { value: 'valide', label: 'Validé — à envoyer au client', badge: 'bg-blue-100 text-blue-700' },
   { value: 'converti', label: 'Converti', badge: 'bg-emerald-100 text-emerald-700' },
   { value: 'refuse', label: 'Refusé', badge: 'bg-red-100 text-red-700' },
   { value: 'expire', label: 'Expiré', badge: 'bg-amber-100 text-amber-800' },

@@ -65,6 +65,7 @@ export default function Sidebar({ companyName, mobileOpen, onCloseMobile, can }:
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto py-2 px-2 space-y-px">
+          {(!HOME.perm || can(HOME.perm)) && (
           <Link
             to={HOME.path}
             onClick={onCloseMobile}
@@ -75,6 +76,7 @@ export default function Sidebar({ companyName, mobileOpen, onCloseMobile, can }:
             <Icon d={ICONS.home} className={`w-5 h-5 shrink-0 ${homeActive ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
             {!collapsed && <span className="truncate">{HOME.label}</span>}
           </Link>
+          )}
 
           {visibleModules.map((m) => {
             const isOpen = open === m.key && !collapsed

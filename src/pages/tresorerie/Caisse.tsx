@@ -123,7 +123,16 @@ export default function Caisse() {
     if (error) return setMsg({ ok: false, text: error.message })
     const pays = await loadPayments({ clientId: sel.client_id })
     const p = pays.find((x) => x.id === (data as string))
-    setMsg({ ok: true, text: `Encaissement ${p?.number ?? ''} enregistré : ${fcfa(amount)} FCFA.`, payment: p })
+    // la commande payée part automatiquement en production
+    let ofText = ''
+    const orderId = sel.kind === 'commande' ? sel.id : p?.order_id ?? null
+    if (orderId) {
+      const { data: po } = await supabase.from('production_orders').select('number, status, created_at').eq('order_id', orderId).in('status', ['cree', 'en_production', 'soumis']).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      const x = po as { number: string; created_at: string } | null
+      if (x && Date.now() - new Date(x.created_at).getTime() < 120000) ofText = ` La commande est transmise à la production : ordre de fabrication ${x.number}.`
+      else if (!x && amount < sel.ttc - sel.paid - 0.5) ofText = ' Paiement partiel : la commande partira en production quand le paiement requis sera atteint.'
+    }
+    setMsg({ ok: true, text: `Encaissement ${p?.number ?? ''} enregistré : ${fcfa(amount)} FCFA.${ofText}`, payment: p })
     setSel(null)
     await Promise.all([loadDues(), loadToday(), loadSession(accountId)])
   }
@@ -192,9 +201,11 @@ export default function Caisse() {
               </option>
             ))}
           </select>
-          <Link to="/tresorerie/encaissements" className="px-3 py-2 border border-gray-300 text-gray-700 rounded-[4px] text-sm hover:bg-gray-50">
-            Historique
-          </Link>
+          {ctx.can('treasury.view') && (
+            <Link to="/tresorerie/encaissements" className="px-3 py-2 border border-gray-300 text-gray-700 rounded-[4px] text-sm hover:bg-gray-50">
+              Historique
+            </Link>
+          )}
         </div>
       </div>
 
@@ -317,9 +328,13 @@ export default function Caisse() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-gray-500">{sel.kind === 'commande' ? 'Commande' : 'Facture'}</p>
-                  <Link to={sel.kind === 'commande' ? `/ventes/commandes/${sel.id}` : `/ventes/factures/${sel.id}`} className="font-mono font-semibold text-emerald-700 hover:underline">
-                    {sel.number}
-                  </Link>
+                  {ctx.can(sel.kind === 'commande' ? 'orders.view' : 'invoices.view') ? (
+                    <Link to={sel.kind === 'commande' ? `/ventes/commandes/${sel.id}` : `/ventes/factures/${sel.id}`} className="font-mono font-semibold text-emerald-700 hover:underline">
+                      {sel.number}
+                    </Link>
+                  ) : (
+                    <span className="font-mono font-semibold">{sel.number}</span>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Client</p>

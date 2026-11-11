@@ -320,8 +320,8 @@ export default function OFShow() {
 
       <Info
         items={[
-          ['Commande', of.order_id ? <Link to={`/ventes/commandes/${of.order_id}`} className="font-mono text-emerald-700 hover:underline">{of.sales_orders?.number}</Link> : null],
-          ['Client', of.clients ? <Link to={`/ventes/clients/${of.client_id}`} className="font-semibold text-emerald-700 hover:underline">{of.clients.name}</Link> : null],
+          ['Commande', of.order_id ? ctx.can('orders.view') ? <Link to={`/ventes/commandes/${of.order_id}`} className="font-mono text-emerald-700 hover:underline">{of.sales_orders?.number}</Link> : <span className="font-mono">{of.sales_orders?.number}</span> : null],
+          ['Client', of.clients ? ctx.can('clients.view') ? <Link to={`/ventes/clients/${of.client_id}`} className="font-semibold text-emerald-700 hover:underline">{of.clients.name}</Link> : of.clients.name : null],
           ['Date prévue', dFr(of.planned_date)],
           ['Dépôt de production', of.warehouses ? `${of.warehouses.code} — ${of.warehouses.name}` : null],
           ['Ligne de production', of.production_lines?.name],

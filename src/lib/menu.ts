@@ -18,7 +18,9 @@ export type MenuItem = { label: string; path: string; perm?: string }
 export type MenuSection = { title: string; items: MenuItem[] }
 export type MenuModule = { key: string; label: string; icon: string; sections: MenuSection[] }
 
-export const HOME: MenuItem = { label: 'Tableau de bord', path: '/' }
+export const HOME: MenuItem = { label: 'Tableau de bord', path: '/', perm: 'direction.view' }
+// Écrans pas encore construits : visibles seulement par le super administrateur
+const SOON = 'roadmap.soon'
 
 export const modules: MenuModule[] = [
   {
@@ -33,7 +35,7 @@ export const modules: MenuModule[] = [
       { title: 'Logistique', items: [{ label: 'Bons de livraison', path: '/ventes/livraisons', perm: 'deliveries.view' }] },
       { title: 'Facturation', items: [
         { label: 'Factures clients', path: '/ventes/factures', perm: 'invoices.view' },
-        { label: 'Avoirs clients', path: '/ventes/avoirs' },
+        { label: 'Avoirs clients', path: '/ventes/avoirs', perm: SOON },
       ] },
       { title: 'Tiers', items: [{ label: 'Clients', path: '/ventes/clients', perm: 'clients.view' }] },
     ],
@@ -57,7 +59,7 @@ export const modules: MenuModule[] = [
     sections: [
       { title: 'Référentiel', items: [{ label: 'Articles', path: '/stocks/articles', perm: 'products.view' }] },
       { title: 'Suivi', items: [
-        { label: 'Niveaux de stock', path: '/stocks/niveaux' },
+        { label: 'Niveaux de stock', path: '/stocks/niveaux', perm: SOON },
         { label: 'Mouvements de stock', path: '/stocks/mouvements', perm: 'stocks.view' },
         { label: 'Bobines', path: '/stocks/bobines', perm: 'stocks.view' },
         { label: 'Fins de bobine', path: '/stocks/fins-bobine', perm: 'stocks.view' },
@@ -72,7 +74,7 @@ export const modules: MenuModule[] = [
       { title: 'Fabrication', items: [
         { label: 'Ordres de fabrication', path: '/production/of', perm: 'production.view' },
       ] },
-      { title: 'Référentiel', items: [{ label: 'Lignes de production', path: '/production/lignes' }] },
+      { title: 'Référentiel', items: [{ label: 'Lignes de production', path: '/production/lignes', perm: SOON }] },
     ],
   },
   {
@@ -82,11 +84,11 @@ export const modules: MenuModule[] = [
     sections: [
       { title: 'Caisse', items: [
         { label: 'Caisse / Encaissement client', path: '/tresorerie/caisse', perm: 'payments.view' },
-        { label: 'Encaissements clients', path: '/tresorerie/encaissements', perm: 'payments.view' },
-        { label: 'Opérations de caisse', path: '/tresorerie/operations' },
-        { label: 'Ouverture / Clôture de caisse', path: '/tresorerie/sessions', perm: 'payments.view' },
+        { label: 'Encaissements clients', path: '/tresorerie/encaissements', perm: 'treasury.view' },
+        { label: 'Opérations de caisse', path: '/tresorerie/operations', perm: SOON },
+        { label: 'Ouverture / Clôture de caisse', path: '/tresorerie/sessions', perm: 'treasury.view' },
       ] },
-      { title: 'Comptes', items: [{ label: 'Caisses & banques', path: '/tresorerie/comptes' }] },
+      { title: 'Comptes', items: [{ label: 'Caisses & banques', path: '/tresorerie/comptes', perm: SOON }] },
     ],
   },
   {
@@ -100,9 +102,9 @@ export const modules: MenuModule[] = [
         { label: 'Rôles & permissions', path: '/parametres/roles', perm: 'roles.manage' },
       ] },
       { title: 'Référentiels', items: [
-        { label: 'Catégories articles', path: '/parametres/categories' },
-        { label: 'Dépôts', path: '/parametres/depots', perm: 'stocks.view' },
-        { label: 'Unités, TVA, règlements', path: '/parametres/referentiels' },
+        { label: 'Catégories articles', path: '/parametres/categories', perm: SOON },
+        { label: 'Dépôts', path: '/parametres/depots', perm: 'settings.manage' },
+        { label: 'Unités, TVA, règlements', path: '/parametres/referentiels', perm: SOON },
       ] },
     ],
   },
