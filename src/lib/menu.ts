@@ -60,6 +60,7 @@ export const modules: MenuModule[] = [
         { label: 'Niveaux de stock', path: '/stocks/niveaux' },
         { label: 'Mouvements de stock', path: '/stocks/mouvements', perm: 'stocks.view' },
         { label: 'Bobines', path: '/stocks/bobines', perm: 'stocks.view' },
+        { label: 'Fins de bobine', path: '/stocks/fins-bobine', perm: 'stocks.view' },
       ] },
     ],
   },
@@ -69,8 +70,7 @@ export const modules: MenuModule[] = [
     icon: ICONS.production,
     sections: [
       { title: 'Fabrication', items: [
-        { label: 'Ordres de fabrication', path: '/production/of' },
-        { label: 'Déclarations', path: '/production/declarations' },
+        { label: 'Ordres de fabrication', path: '/production/of', perm: 'production.view' },
       ] },
       { title: 'Référentiel', items: [{ label: 'Lignes de production', path: '/production/lignes' }] },
     ],

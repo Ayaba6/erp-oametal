@@ -12,8 +12,8 @@ export const pdf = 'bg-red-600 text-white hover:bg-red-700'
 
 export function DocHeader({ number, badge, sub, children }: { number: string; badge: { label: string; badge: string }; sub: ReactNode; children: ReactNode }) {
   return (
-    <div className="bg-white rounded-[4px] border border-gray-300 p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="bg-white rounded-[4px] border border-gray-300 p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-lg font-bold text-gray-900 font-mono">{number}</h1>
           <span className={`inline-flex items-center px-2.5 py-1 rounded-[3px] text-xs font-semibold ${badge.badge}`}>{badge.label}</span>
@@ -50,9 +50,9 @@ export function Steps({ steps, current }: { steps: { key: string; label: string;
 
 export function Info({ title = 'Informations', items }: { title?: string; items: [string, ReactNode][] }) {
   return (
-    <div className="bg-white rounded-[4px] border border-gray-300 p-5 space-y-4">
+    <div className="bg-white rounded-[4px] border border-gray-300 p-4 sm:p-5 space-y-4">
       <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:gap-4 text-sm">
         {items
           .filter(([, v]) => v !== null && v !== undefined && v !== '')
           .map(([k, v]) => (

@@ -16,7 +16,9 @@ type Movement = {
   type: string
   reason: string | null
   created_by: string | null
-  products: { code: string; name: string } | null
+  source_table: string | null
+  source_id: string | null
+  products: { code: string; name: string; kind: string | null } | null
   warehouses: { code: string; name: string } | null
   coils: { reference: string; reception_lines: { receptions: { id: string; number: string } | null } | null } | null
 }
@@ -39,12 +41,20 @@ const typeOf = (t: string) => TYPES[t] ?? { label: t, badge: 'bg-gray-100 text-g
 const filterInput = 'border border-gray-300 rounded-[4px] px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
 const th = 'font-bold px-3 py-2 uppercase tracking-wide text-[11px]'
 const COLUMNS =
-  'id, occurred_at, product_id, warehouse_id, coil_id, quantity, type, reason, created_by, products(code, name), warehouses(code, name), coils(reference, reception_lines(receptions(id, number)))'
+  'id, occurred_at, product_id, warehouse_id, coil_id, quantity, type, reason, created_by, source_table, source_id, products(code, name, kind), warehouses(code, name), coils(reference, reception_lines(receptions(id, number)))'
 
-// Document d'origine : n° de transfert dans le libellé, ou n° de réception de la bobine
+// Unité selon l'article : bobines en kg, tôles en m, faîtières en pièces
+const unitOf = (m: Movement) => (m.products?.kind === 'tole' ? 'm' : m.products?.kind === 'faitiere' ? 'pce' : 'kg')
+const isCoil = (m: Movement) => unitOf(m) === 'kg'
+
+// Document d'origine : n° de transfert / OF / BL dans le libellé, ou n° de réception de la bobine
 function documentOf(m: Movement, trfIds: Record<string, string> = {}): { label: string; to: string | null } {
   const trf = /TRF-\d{4}-\d+/.exec(m.reason ?? '')?.[0]
   if (trf) return { label: trf, to: trfIds[trf] ? `/stocks/transferts/${trfIds[trf]}` : null }
+  const of = /OF-\d{4}-\d+/.exec(m.reason ?? '')?.[0]
+  if (of) return { label: of, to: m.source_table === 'production_orders' && m.source_id ? `/production/of/${m.source_id}` : trfIds[of] ? `/production/of/${trfIds[of]}` : null }
+  const bl = /BL-\d{4}-\d+/.exec(m.reason ?? '')?.[0]
+  if (bl) return { label: bl, to: m.source_table === 'deliveries' && m.source_id ? `/ventes/livraisons/${m.source_id}` : null }
   const rec = m.coils?.reception_lines?.receptions
   if (m.type === 'reception' && rec) return { label: rec.number, to: `/achats/receptions/${rec.id}` }
   return { label: '—', to: null }
@@ -69,9 +79,11 @@ export default function Mouvements() {
       loadWarehouses(),
       supabase.from('stock_transfers').select('id', { count: 'exact', head: true }).eq('status', 'soumise'),
       supabase.from('stock_transfers').select('id, number'),
-    ]).then(async ([m, w, p, tr]) => {
+      supabase.from('production_orders').select('id, number'),
+    ]).then(async ([m, w, p, tr, po]) => {
       const ids: Record<string, string> = {}
       ;((tr.data as { id: string; number: string }[]) ?? []).forEach((x) => (ids[x.number] = x.id))
+      ;((po.data as { id: string; number: string }[]) ?? []).forEach((x) => (ids[x.number] = x.id))
       setTrfIds(ids)
       const list = (m.data as unknown as Movement[]) ?? []
       setRows(list)
@@ -103,8 +115,12 @@ export default function Mouvements() {
     })
   }, [rows, filter])
 
-  const entries = shown.filter((r) => Number(r.quantity) > 0).reduce((s, r) => s + Number(r.quantity), 0)
-  const exits = shown.filter((r) => Number(r.quantity) < 0).reduce((s, r) => s - Number(r.quantity), 0)
+  const coilRows = shown.filter(isCoil)
+  const sheetRows = shown.filter((r) => unitOf(r) === 'm')
+  const entries = coilRows.filter((r) => Number(r.quantity) > 0).reduce((s, r) => s + Number(r.quantity), 0)
+  const exits = coilRows.filter((r) => Number(r.quantity) < 0).reduce((s, r) => s - Number(r.quantity), 0)
+  const mIn = sheetRows.filter((r) => Number(r.quantity) > 0).reduce((s, r) => s + Number(r.quantity), 0)
+  const mOut = sheetRows.filter((r) => Number(r.quantity) < 0).reduce((s, r) => s - Number(r.quantity), 0)
 
   function onFilter(e: FormEvent) {
     e.preventDefault()
@@ -119,9 +135,10 @@ export default function Mouvements() {
       'N° bobine': r.coils?.reference ?? '',
       Article: r.products ? `${r.products.code} — ${r.products.name}` : '',
       Dépôt: r.warehouses?.code ?? '',
-      'Entrée (kg)': Number(r.quantity) > 0 ? Number(r.quantity) : '',
-      'Sortie (kg)': Number(r.quantity) < 0 ? -Number(r.quantity) : '',
-      Document: documentOf(r).label,
+      Entrée: Number(r.quantity) > 0 ? Number(r.quantity) : '',
+      Sortie: Number(r.quantity) < 0 ? -Number(r.quantity) : '',
+      Unité: unitOf(r),
+      Document: documentOf(r, trfIds).label,
       Libellé: r.reason ?? '',
       Par: r.created_by ? names[r.created_by] ?? '' : '',
     }))
@@ -149,7 +166,7 @@ export default function Mouvements() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[16px] font-bold text-gray-900">Mouvements de stock</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Toutes les entrées et sorties de bobines, et les demandes de transfert vers la production.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Entrées et sorties de bobines (kg) et de tôles (m), et les demandes de transfert vers la production.</p>
         </div>
         {ctx.can('stocks.transfer') && (
           <Link to="/stocks/transferts/nouveau" className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-3 py-1.5 rounded-[4px] self-start">
@@ -176,22 +193,22 @@ export default function Mouvements() {
               <p className="text-[16px] font-bold text-gray-900 tabular-nums">{shown.length}</p>
             </div>
             <div className="bg-white rounded-[4px] border border-gray-300 px-3 py-1.5">
-              <p className="text-xs text-gray-500">Entrées</p>
-              <p className="text-[16px] font-bold text-emerald-600 tabular-nums">+{kg(entries)} kg</p>
+              <p className="text-xs text-gray-500">Bobines : entrées / sorties</p>
+              <p className="text-[14px] font-bold tabular-nums"><span className="text-emerald-600">+{kg(entries)}</span> / <span className="text-red-600">−{kg(exits)}</span> kg</p>
             </div>
             <div className="bg-white rounded-[4px] border border-gray-300 px-3 py-1.5">
-              <p className="text-xs text-gray-500">Sorties</p>
-              <p className="text-[16px] font-bold text-red-600 tabular-nums">−{kg(exits)} kg</p>
+              <p className="text-xs text-gray-500">Tôles : entrées / sorties</p>
+              <p className="text-[14px] font-bold tabular-nums"><span className="text-emerald-600">+{kg(mIn)}</span> / <span className="text-red-600">−{kg(mOut)}</span> m</p>
             </div>
             <div className="bg-white rounded-[4px] border border-gray-300 px-3 py-1.5">
-              <p className="text-xs text-gray-500">Solde</p>
-              <p className="text-[16px] font-bold text-gray-900 tabular-nums">{kg(entries - exits)} kg</p>
+              <p className="text-xs text-gray-500">Solde bobines / tôles</p>
+              <p className="text-[14px] font-bold text-gray-900 tabular-nums">{kg(entries - exits)} kg · {kg(mIn - mOut)} m</p>
             </div>
           </div>
 
-          <form onSubmit={onFilter} className="bg-white rounded-[4px] border border-gray-300 p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-              <input value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="N° bobine, TRF…" className={filterInput} />
+          <form onSubmit={onFilter} className="bg-white rounded-[4px] border border-gray-300 p-3 sm:p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-3">
+              <input value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="N° bobine, TRF, OF, BL…" className={`${filterInput} col-span-2 sm:col-span-1`} />
               <select value={form.depot} onChange={(e) => setForm({ ...form, depot: e.target.value })} className={filterInput}>
                 <option value="">Tous les dépôts</option>
                 {depots.map((d) => (
@@ -218,7 +235,7 @@ export default function Mouvements() {
               </select>
               <input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} className={filterInput} title="Du" />
               <input type="date" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} className={filterInput} title="Au" />
-              <div className="flex gap-2">
+              <div className="flex gap-2 col-span-2 sm:col-span-1">
                 <button type="submit" className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-3 py-1.5 rounded-[4px]">
                   Filtrer
                 </button>
@@ -239,8 +256,8 @@ export default function Mouvements() {
                     <th className={`${th} text-left`}>N° bobine</th>
                     <th className={`${th} text-left hidden lg:table-cell`}>Article</th>
                     <th className={`${th} text-left`}>Dépôt</th>
-                    <th className={`${th} text-right`}>Entrée (kg)</th>
-                    <th className={`${th} text-right`}>Sortie (kg)</th>
+                    <th className={`${th} text-right`}>Entrée</th>
+                    <th className={`${th} text-right`}>Sortie</th>
                     <th className={`${th} text-left`}>Document</th>
                     <th className={`${th} text-left hidden md:table-cell`}>Par</th>
                   </tr>
@@ -261,8 +278,8 @@ export default function Mouvements() {
                           <span className="font-mono text-gray-500">{r.products?.code}</span> {r.products?.name}
                         </td>
                         <td className="px-3 py-1.5 font-mono text-gray-700">{r.warehouses?.code}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{q > 0 ? `+${kg(q)}` : ''}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-red-600">{q < 0 ? `−${kg(-q)}` : ''}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{q > 0 ? `+${kg(q)} ${unitOf(r)}` : ''}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-red-600">{q < 0 ? `−${kg(-q)} ${unitOf(r)}` : ''}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">
                           {doc.to ? (
                             <Link to={doc.to} className="text-emerald-700 hover:underline">
@@ -287,7 +304,7 @@ export default function Mouvements() {
               </table>
             </div>
             <div className="px-3 py-2 border-t border-gray-200 bg-[#f7faf8] text-xs text-gray-500">
-              {shown.length} mouvement(s) · Entrées <b className="text-emerald-700">+{kg(entries)} kg</b> · Sorties <b className="text-red-600">−{kg(exits)} kg</b>
+              {shown.length} mouvement(s) · Bobines <b className="text-emerald-700">+{kg(entries)}</b> / <b className="text-red-600">−{kg(exits)}</b> kg · Tôles <b className="text-emerald-700">+{kg(mIn)}</b> / <b className="text-red-600">−{kg(mOut)}</b> m
             </div>
           </div>
         </>

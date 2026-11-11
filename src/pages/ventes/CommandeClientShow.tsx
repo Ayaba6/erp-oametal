@@ -5,6 +5,7 @@ import { AppContext } from '../../lib/session'
 import { Delivery, Invoice, Payment, SalesOrder, dFr, deliveryStatus, dtFr, fcfa, invoiceStatus, loadDeliveries, loadInvoices, loadPayments, loadSalesOrder, orderStatus, profileNames } from './salesData'
 import { Ask, Confirm, DocHeader, Info, Lines, Msg, Recap, Steps, amber, btn, danger, outline, pdf, primary } from './DocParts'
 import { printPriced } from './printSales'
+import { ProductionOrder, loadProductionOrders, ofStatus } from '../production/prodData'
 
 export default function CommandeClientShow() {
   const { id } = useParams()
@@ -14,6 +15,8 @@ export default function CommandeClientShow() {
   const [pays, setPays] = useState<Payment[]>([])
   const [bls, setBls] = useState<Delivery[]>([])
   const [invs, setInvs] = useState<Invoice[]>([])
+  const [ofs, setOfs] = useState<ProductionOrder[]>([])
+  const [prodBlock, setProdBlock] = useState<string | null>(null)
   const [names, setNames] = useState<Record<string, string>>({})
   const [ask, setAsk] = useState<Ask | null>(null)
   const [note, setNote] = useState('')
@@ -21,7 +24,16 @@ export default function CommandeClientShow() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function reload() {
-    const [x, p, d, i] = await Promise.all([loadSalesOrder(id!), loadPayments({ orderId: id! }), loadDeliveries(id!), loadInvoices(id!)])
+    const [x, p, d, i, f, b] = await Promise.all([
+      loadSalesOrder(id!),
+      loadPayments({ orderId: id! }),
+      loadDeliveries(id!),
+      loadInvoices(id!),
+      loadProductionOrders(id!),
+      supabase.rpc('order_production_block', { p_order: id! }),
+    ])
+    setOfs(f)
+    setProdBlock((b.data as string | null) ?? null)
     setO(x)
     setPays(p)
     setBls(d)
@@ -49,6 +61,11 @@ export default function CommandeClientShow() {
   const update = async (patch: Record<string, unknown>) => {
     const r = await supabase.from('sales_orders').update(patch).eq('id', o.id)
     if (r.error) throw new Error(r.error.message)
+  }
+  const makeOf = async () => {
+    const r = await supabase.rpc('create_production_order', { p_order: o.id })
+    if (r.error) throw new Error(r.error.message)
+    navigate(`/production/of/${r.data as string}`)
   }
   const invoice = async () => {
     const r = await supabase.rpc('invoice_order', { p_order: o.id })
@@ -87,6 +104,17 @@ export default function CommandeClientShow() {
           <Link to={`/tresorerie/caisse?commande=${o.id}`} className={`${btn} ${amber}`}>
             Encaisser
           </Link>
+        )}
+        {active && toDeliver && ctx.can('production.create') && !ofs.some((f) => ['cree', 'en_production', 'soumis'].includes(f.status)) && (
+          <button
+            type="button"
+            disabled={busy || !!prodBlock}
+            title={prodBlock ?? ''}
+            onClick={() => setAsk({ question: `Transformer la commande ${o.number} en ordre de fabrication ?`, run: makeOf })}
+            className={`${btn} ${primary}`}
+          >
+            Créer l'OF
+          </button>
         )}
         {active && toDeliver && ctx.can('deliveries.create') && (
           <Link to={draftBl ? `/ventes/livraisons/${draftBl.id}` : `/ventes/livraisons/nouveau?commande=${o.id}`} className={`${btn} ${outline}`}>
@@ -138,6 +166,9 @@ export default function CommandeClientShow() {
 
       {ask && <Confirm ask={ask} busy={busy} note={note} setNote={setNote} onCancel={() => setAsk(null)} onOk={() => run(ask)} />}
       <Msg msg={msg} />
+      {active && toDeliver && prodBlock && ctx.can('production.create') && !ofs.length && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-[4px] px-4 py-2">Production : {prodBlock}</div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -160,7 +191,34 @@ export default function CommandeClientShow() {
 
       <Lines lines={o.document_lines} title="Lignes de commande" delivered />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="bg-white rounded-[4px] border border-gray-300 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 font-semibold text-gray-900">Ordres de fabrication ({ofs.length})</div>
+          <table className="w-full text-[12.5px]">
+            <tbody className="divide-y divide-gray-100">
+              {ofs.map((f) => {
+                const st = ofStatus(f.status)
+                return (
+                  <tr key={f.id}>
+                    <td className="px-3 py-1.5 font-mono">
+                      <Link to={`/production/of/${f.id}`} className="text-emerald-700 hover:underline">
+                        {f.number}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${st.badge}`}>{st.label}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {ofs.length === 0 && (
+                <tr>
+                  <td className="px-3 py-4 text-center text-gray-400">Aucun OF.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
         <div className="bg-white rounded-[4px] border border-gray-300 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 font-semibold text-gray-900">Encaissements ({pays.filter((p) => p.status === 'confirme').length})</div>
           <table className="w-full text-[12.5px]">

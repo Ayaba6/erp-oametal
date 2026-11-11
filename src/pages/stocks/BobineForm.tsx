@@ -282,6 +282,11 @@ export default function BobineForm() {
         </fieldset>
 
         <div className="flex justify-end gap-2 mt-4">
+          {id && ctx.can('stocks.coil_end') && (
+            <Link to={`/stocks/fins-bobine/nouvelle?bobine=${id}`} className={btnSecondary}>
+              Fiche fin de bobine
+            </Link>
+          )}
           <Link to="/stocks/bobines" className={btnSecondary}>
             {readOnly ? 'Retour' : 'Annuler'}
           </Link>

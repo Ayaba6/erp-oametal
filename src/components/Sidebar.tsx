@@ -41,7 +41,7 @@ export default function Sidebar({ companyName, mobileOpen, onCloseMobile, can }:
     <>
       {mobileOpen && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={onCloseMobile} />}
       <aside
-        className={`bg-[#22282b] text-gray-300 fixed inset-y-0 left-0 z-30 flex flex-col transition-transform duration-300 lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 ${
+        className={`safe-top bg-[#22282b] text-gray-300 fixed inset-y-0 left-0 z-30 flex flex-col transition-transform duration-300 lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } ${collapsed ? 'w-16' : 'w-64'}`}
       >

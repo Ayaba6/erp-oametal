@@ -45,9 +45,13 @@ import Caisse from './pages/tresorerie/Caisse'
 import Encaissements from './pages/tresorerie/Encaissements'
 import Sessions from './pages/tresorerie/Sessions'
 import Societe from './pages/parametres/Societe'
+import OrdresFabrication from './pages/production/OrdresFabrication'
+import OFShow from './pages/production/OFShow'
+import FinsBobine from './pages/stocks/FinsBobine'
+import FinBobine from './pages/stocks/FinBobine'
 
 // Écrans déjà construits (les autres affichent « Bientôt disponible »)
-const BUILT = ['/parametres/utilisateurs', '/parametres/roles', '/stocks/articles', '/stocks/bobines', '/parametres/depots', '/achats/commandes', '/achats/receptions', '/achats/fournisseurs', '/stocks/transferts', '/stocks/mouvements', '/ventes/clients', '/ventes/devis', '/ventes/commandes', '/ventes/livraisons', '/ventes/factures', '/tresorerie/caisse', '/tresorerie/encaissements', '/tresorerie/sessions', '/parametres/societe']
+const BUILT = ['/parametres/utilisateurs', '/parametres/roles', '/stocks/articles', '/stocks/bobines', '/parametres/depots', '/achats/commandes', '/achats/receptions', '/achats/fournisseurs', '/stocks/transferts', '/stocks/mouvements', '/ventes/clients', '/ventes/devis', '/ventes/commandes', '/ventes/livraisons', '/ventes/factures', '/tresorerie/caisse', '/tresorerie/encaissements', '/tresorerie/sessions', '/parametres/societe', '/production/of', '/stocks/fins-bobine']
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -128,6 +132,11 @@ export default function App() {
         <Route path="/tresorerie/caisse" element={<Guard ok={ctx.can('payments.view')}><Caisse /></Guard>} />
         <Route path="/tresorerie/encaissements" element={<Guard ok={ctx.can('payments.view')}><Encaissements /></Guard>} />
         <Route path="/tresorerie/sessions" element={<Guard ok={ctx.can('payments.view')}><Sessions /></Guard>} />
+        <Route path="/stocks/fins-bobine" element={<Guard ok={ctx.can('stocks.view')}><FinsBobine /></Guard>} />
+        <Route path="/stocks/fins-bobine/nouvelle" element={<Guard ok={ctx.can('stocks.coil_end')}><FinBobine key="new" /></Guard>} />
+        <Route path="/stocks/fins-bobine/:id" element={<Guard ok={ctx.can('stocks.view')}><FinBobine key="show" /></Guard>} />
+        <Route path="/production/of" element={<Guard ok={ctx.can('production.view')}><OrdresFabrication /></Guard>} />
+        <Route path="/production/of/:id" element={<Guard ok={ctx.can('production.view')}><OFShow /></Guard>} />
         <Route path="/parametres/societe" element={<Guard ok={ctx.can('company.view')}><Societe /></Guard>} />
         <Route path="/parametres/depots" element={<Guard ok={ctx.can('stocks.view')}><Depots /></Guard>} />
         <Route path="/parametres/roles" element={<Guard ok={ctx.can('roles.manage')}><RoleList /></Guard>} />

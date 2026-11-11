@@ -7,3 +7,24 @@ body { font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, ui-sans-serif, 
 
 /* Graphiques ApexCharts : même police que le reste */
 .apexcharts-canvas text { font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; }
+
+/* ---------- Mobile / PWA ---------- */
+/* Un élément de grille ne doit jamais élargir la page (tableaux larges dans un bloc défilant) */
+main .grid > * { min-width: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { overscroll-behavior-y: none; }
+
+@media (max-width: 767px) {
+  /* Les tableaux défilent horizontalement au lieu d'écraser les colonnes */
+  main .overflow-x-auto > table, main .overflow-x-auto table { min-width: 640px; }
+  /* iPhone : pas de zoom automatique quand on touche un champ */
+  input:not([type='checkbox']):not([type='radio']), select, textarea { font-size: 16px !important; }
+  /* Zones tactiles plus confortables */
+  main button, main a.inline-flex { min-height: 36px; }
+}
+
+/* Encoches et barre d'accueil des téléphones (application installée) */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}

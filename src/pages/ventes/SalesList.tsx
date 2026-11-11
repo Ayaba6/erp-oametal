@@ -91,9 +91,9 @@ export default function SalesList<T extends { id: string; number: string; status
         )}
       </div>
 
-      <form onSubmit={onFilter} className="bg-white rounded-[4px] border border-gray-300 p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <input value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="Numéro, client..." className={fInput} />
+      <form onSubmit={onFilter} className="bg-white rounded-[4px] border border-gray-300 p-3 sm:p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <input value={form.search} onChange={(e) => setForm({ ...form, search: e.target.value })} placeholder="Numéro, client..." className={`${fInput} col-span-2 sm:col-span-1`} />
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={fInput}>
             <option value="">Tous les statuts</option>
             {statuses.map((s) => (
@@ -112,7 +112,7 @@ export default function SalesList<T extends { id: string; number: string; status
           </select>
           <input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} className={fInput} title="Du" />
           <input type="date" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} className={fInput} title="Au" />
-          <button type="submit" className="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-3 py-1.5 rounded-[4px]">
+          <button type="submit" className="col-span-2 sm:col-span-1 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-3 py-1.5 rounded-[4px]">
             Filtrer
           </button>
         </div>
